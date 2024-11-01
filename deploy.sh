@@ -95,6 +95,14 @@ DYNAMODB_TABLE=$(aws cloudformation describe-stacks \
     --output text)
 echo "$DYNAMODB_TABLE"
 
+# Get the CloudFront Distribution Domain Name
+echo -n "Getting Distribution Domain Name... "
+DISTRIBUTION_DOMAIN=$(aws cloudformation describe-stacks \
+    --stack-name bedrock-api-stack \
+    --query 'Stacks[0].Outputs[?OutputKey==`DistributionDomainName`].OutputValue' \
+    --output text)
+echo "$DISTRIBUTION_DOMAIN"
+
 # Optional: Print a summary of all values
 echo -e "\nStack Output Summary:"
 echo "===================="
@@ -175,6 +183,7 @@ if [ $? -ne 0 ]; then
 fi
 echo "Successfully inserted questions into DynamoDB"
 
-fi
-
-echo "Deployment completed successfully!"
+# Print the final message with the URL
+echo -e "\nDeployment completed successfully!"
+echo -e "\nTo access the application, open the following URL in Chrome browser:"
+echo "https://${DISTRIBUTION_DOMAIN}"

@@ -1,0 +1,5 @@
+{
+    "apiEndpoint": "https://5asocq83vc.execute-api.us-east-1.amazonaws.com/prod",
+    "identityPoolId": "us-east-1:7e72cfaf-7120-4918-85d5-0e9d57e5f702",
+    "region": "us-east-1"
+}

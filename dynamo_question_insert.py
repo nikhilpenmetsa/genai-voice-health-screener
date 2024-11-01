@@ -43,7 +43,34 @@ def get_questions() -> List[str]:
     """
     return [
         "Are you a citizen of the United States?",
-        "Do you desire Automatic Premium Loan Provision (if available)?"
+        "Have you ever been rejected for life insurance, rated, or failed to receive a policy as applied for?",
+        "Have you ever had or been treated for high blood pressure, chest pain, heart attack, stroke or any heart or circulatory disorder?",
+        "Have you ever had or been treated for asthma, emphysema, or other respiratory disorder?",
+        "Have you ever had or been treated for ulcer, colitis, or other digestive tract disorder?",
+        "Have you ever had or been treated for cirrhosis, hepatitis, or other liver disorder or any blood disorder?",
+        "Have you ever had or been treated for diabetes or other endocrine disorder?",
+        "Have you ever had or been treated for kidney, prostate, urinary, bladder or other genitourinary disorder?",
+        "Have you ever had or been treated for paralysis, epilepsy, mental disease or disorder or any other nervous system, brain disorder or psychological disorder?",
+        "Have you ever had or been treated for cancer, tumor, or unexplained masses?",
+        "Have you ever had or been treated for disease of the breasts, uterus, or ovaries?",
+        "Have you ever had or been treated for rheumatoid arthritis or any musculoskeletal disorder?",
+        "In the last five years, have you had a physical examination?",
+        "In the last five years, have you had any medical treatment? (includes prescription medications)",
+        "In the last five years, have you been hospitalized?",
+        "Have you ever applied for or received disability or workers' compensation benefits based on permanent disability or are you currently receiving government, workers' compensation or disability policy benefits for temporary disability?",
+        "Have you ever been treated or been advised to be treated for alcoholism or alcohol abuse including membership in A.A., or been advised by a physician to reduce alcohol consumption?",
+        "Have you ever used alcohol to excess or used narcotics, sedatives, or hallucinogens?",
+        "Have you used marijuana in the past year?",
+        "Have you ever been arrested, including arrests for driving while intoxicated or under the influence?",
+        "Do you smoke cigarettes or use tobacco in any other form?",
+        "If you are a former user of tobacco, when did you quit?",
+        "Do you desire Automatic Premium Loan Provision (if available)?",
+        "Do you have existing life insurance or annuities in force, including policies under conditional receipt, other than Group or Credit Life Insurance with this or any other company?",
+        "Is the insurance applied for intended to replace or change any existing insurance or annuities with this or any other company?",
+        "Within the last two years, have you made or intend to make any flights other than as a passenger on a scheduled airline?",
+        "Within the last two years, have you engaged in or intend to engage in automobile, motorboat, or motorcycle racing, scuba, skin or sky diving?",
+        "Do you plan to travel or reside outside the United States or Canada within the next year?",
+        "Have you ever tested positive for exposure to the Human"
     ]
 
 def insert_question(dynamodb: boto3.client, 
