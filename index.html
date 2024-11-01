@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Voice based health screening assistant</title>
+    <link rel="icon" href="data:,">
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+
+        .question-section {
+            margin: 20px 0;
+            padding: 20px;
+            background-color: #f0f7ff;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .controls {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        #startBtn {
+            background-color: #4CAF50;
+            color: white;
+        }
+
+        #startBtn.listening {
+            background-color: #f44336;
+        }
+
+        .response-item {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+            transition: all 0.3s ease;
+        }
+
+        .response-item.current {
+            border-color: #2196F3;
+            background-color: #e3f2fd;
+        }
+
+        .response-item.completed {
+            border-color: #4CAF50;
+        }
+
+        .response-item.pending {
+            border-color: #ffd700;
+        }
+
+        .question-number {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+
+        .question-text {
+            margin-bottom: 10px;
+        }
+
+        .answer-text {
+            color: #444;
+        }
+
+        .status-indicator {
+            float: right;
+            font-size: 1.2em;
+        }
+
+        #output {
+            min-height: 50px;
+            padding: 10px;
+            background-color: #f5f5f5;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+
+        .relevancy-score {
+            margin-top: 5px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+
+        .high-relevancy {
+            color: #28a745;
+        }
+
+        .medium-relevancy {
+            color: #ffc107;
+        }
+
+        .low-relevancy {
+            color: #dc3545;
+        }
+
+        .analysis-text {
+            margin-top: 8px;
+            font-size: 0.9em;
+            color: #555;
+            font-style: italic;
+        }
+
+        .response-item.completed .analysis-text {
+            display: block;
+        }
+
+        .response-item.pending .analysis-text {
+            display: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Health screening assistant</h1>
+
+        <div class="question-section">
+            <h2>Current Question:</h2>
+            <p id="questionDisplay"></p>
+        </div>
+
+        <div class="controls">
+            <button id="prevBtn">Previous</button>
+            <button id="startBtn">Start Listening</button>
+            <button id="nextBtn">Next</button>
+        </div>
+
+        <div class="response-section">
+            <h2>Current Response:</h2>
+            <div id="output"></div>
+        </div>
+
+        <div class="responses-summary">
+            <h2>Interview Progress:</h2>
+            <div id="responsesList"></div>
+        </div>
+
+        <audio id="audioPlayback"></audio>
+    </div>
+
+    <!-- AWS SDK -->
+    <script src="https://sdk.amazonaws.com/js/aws-sdk-2.1001.0.min.js"></script>
+    <script src="qa-script.js"></script>
+    <!-- Add this in your HTML head or before your script -->
+</body>
+
+</html>

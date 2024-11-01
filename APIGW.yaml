@@ -1,0 +1,571 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Stack for Bedrock API with Lambda and API Gateway'
+
+Parameters:
+  StageName:
+    Type: String
+    Default: 'prod'
+    Description: API Gateway stage name
+
+Resources:
+  # IAM Role for Lambda
+  
+  InterviewQATable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: InterviewQAResponses
+      AttributeDefinitions:
+        - AttributeName: questionId
+          AttributeType: S
+        - AttributeName: sessionId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: questionId
+          KeyType: HASH
+        - AttributeName: sessionId
+          KeyType: RANGE
+      BillingMode: PAY_PER_REQUEST  # On-demand capacity
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  LambdaExecutionRole:
+      Type: AWS::IAM::Role
+      Properties:
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal:
+                Service: lambda.amazonaws.com
+              Action: sts:AssumeRole
+        ManagedPolicyArns:
+          - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        Policies:
+          - PolicyName: BedrockAccess
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - bedrock:InvokeModel
+                  Resource: '*'
+          - PolicyName: DynamoDBAccess
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - dynamodb:Scan
+                    - dynamodb:Query
+                    - dynamodb:GetItem
+                  Resource: !GetAtt InterviewQATable.Arn
+    
+  QuestionsLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import logging
+          import random
+          from boto3.dynamodb.conditions import Key
+
+          # Set up logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          # Initialize DynamoDB client
+          dynamodb = boto3.resource('dynamodb')
+          table = dynamodb.Table('InterviewQAResponses')
+
+          def get_random_questions(count=5):
+              try:
+                  # Use a Scan operation with a projection expression
+                  response = table.scan(
+                      ProjectionExpression='questionId, question, #cat',
+                      ExpressionAttributeNames={
+                          '#cat': 'category'  # 'category' is a reserved word in DynamoDB
+                      }
+                  )
+                  
+                  # Use a dictionary to keep track of unique questions
+                  unique_questions = {}
+                  
+                  # Process initial scan results
+                  for item in response.get('Items', []):
+                      question_id = item.get('questionId')
+                      if question_id not in unique_questions:
+                          unique_questions[question_id] = {
+                              'id': question_id,
+                              'question': item.get('question'),
+                              'category': item.get('category', 'general')
+                          }
+                  
+                  # Handle pagination if there are more items
+                  while 'LastEvaluatedKey' in response:
+                      response = table.scan(
+                          ProjectionExpression='questionId, question, #cat',
+                          ExpressionAttributeNames={
+                              '#cat': 'category'
+                          },
+                          ExclusiveStartKey=response['LastEvaluatedKey']
+                      )
+                      
+                      for item in response.get('Items', []):
+                          question_id = item.get('questionId')
+                          if question_id not in unique_questions:
+                              unique_questions[question_id] = {
+                                  'id': question_id,
+                                  'question': item.get('question'),
+                                  'category': item.get('category', 'general')
+                              }
+                  
+                  # Convert dictionary values to list
+                  all_questions = list(unique_questions.values())
+                  
+                  # Get random questions
+                  num_questions = min(count, len(all_questions))
+                  random_questions = random.sample(all_questions, num_questions)
+                  
+                  return random_questions
+                  
+              except Exception as e:
+                  logger.error(f"Error scanning DynamoDB table: {str(e)}")
+                  raise
+
+          def lambda_handler(event, context):
+              try:
+                  # Get query parameters
+                  query_params = event.get('queryStringParameters', {}) or {}
+                  count = int(query_params.get('count', 5))  # Default to 5 questions
+                  
+                  # Limit maximum questions to 10 for performance
+                  count = min(count, 10)
+                  
+                  # Get random questions from DynamoDB
+                  questions = get_random_questions(count)
+                  
+                  return {
+                      'statusCode': 200,
+                      'headers': {
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*',
+                          'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                          'Access-Control-Allow-Methods': 'GET,OPTIONS'
+                      },
+                      'body': json.dumps({
+                          'questions': questions,
+                          'count': len(questions)
+                      })
+                  }
+                  
+              except Exception as e:
+                  logger.error(f"Error: {str(e)}")
+                  return {
+                      'statusCode': 500,
+                      'headers': {
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*',
+                          'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                          'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+                      },
+                      'body': json.dumps({
+                          'error': str(e),
+                          'message': 'Internal server error while fetching questions'
+                      })
+                  }
+
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 128
+  
+  # Lambda Function
+  BedrockLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import logging
+
+          # Set up logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          bedrock = boto3.client('bedrock-runtime')
+
+          def lambda_handler(event, context):
+              try:
+                  # Log the incoming event
+                  logger.info("Received event: %s", json.dumps(event, indent=2))
+                  
+                  # Get prompt from API Gateway event
+                  body = json.loads(event.get('body', '{}'))
+                  prompt = body.get('prompt', '')
+                  
+                  logger.info("Extracted prompt: %s", prompt)
+                  
+                  if not prompt:
+                      logger.warning("No prompt provided in the request")
+                      return {
+                          'statusCode': 400,
+                          'headers': {
+                              'Content-Type': 'application/json',
+                              'Access-Control-Allow-Origin': '*',
+                              'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                              'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+                          },
+                          'body': json.dumps({'error': 'Prompt is required'})
+                      }
+                  
+                  # Prepare request body for Bedrock
+                  request_body = {
+                      "anthropic_version": "bedrock-2023-05-31",
+                      "messages": [
+                          {
+                              "role": "user",
+                              "content": prompt
+                          }
+                      ],
+                      "max_tokens": 300,
+                      "temperature": 0.5,
+                      "top_p": 1
+                  }
+                  
+                  # Log the request body being sent to Bedrock
+                  logger.info("Bedrock request body: %s", json.dumps(request_body, indent=2))
+                  
+                  # Invoke Bedrock
+                  logger.info("Calling Bedrock invoke_model...")
+                  response = bedrock.invoke_model(
+                      modelId='anthropic.claude-v2',
+                      contentType='application/json',
+                      accept='application/json',
+                      body=json.dumps(request_body)
+                  )
+                  
+                  # Parse response
+                  response_body = json.loads(response['body'].read())
+                  logger.info("Bedrock response body: %s", json.dumps(response_body, indent=2))
+                  
+                  # Extract the text from the content array
+                  response_text = ""
+                  if response_body.get('content'):
+                      for content in response_body['content']:
+                          if content.get('type') == 'text':
+                              response_text += content.get('text', '')
+                  
+                  api_response = {
+                      'statusCode': 200,
+                      'headers': {
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*',
+                          'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                          'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+                      },
+                      'body': json.dumps({
+                          'response': response_text
+                      })
+                  }
+                  
+                  # Log the final response being sent back
+                  logger.info("Sending response: %s", json.dumps(api_response, indent=2))
+                  return api_response
+                  
+              except Exception as e:
+                  logger.error("Error occurred: %s", str(e), exc_info=True)
+                  return {
+                      'statusCode': 500,
+                      'headers': {
+                          'Content-Type': 'application/json',
+                          'Access-Control-Allow-Origin': '*',
+                          'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+                          'Access-Control-Allow-Methods': 'OPTIONS,POST,GET'
+                      },
+                      'body': json.dumps({'error': str(e)})
+                  }
+
+      Runtime: python3.11
+      Timeout: 30
+      MemorySize: 128
+
+  QuestionsLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref QuestionsLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${BedrockApi}/*
+
+  BedrockLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref BedrockLambda
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${BedrockApi}/*
+
+
+# Add this to your Resources section in APIGW.yaml
+  BedrockApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: BedrockAPI
+      Description: API for Bedrock Integration
+
+  QuestionsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref BedrockApi
+      ParentId: !GetAtt BedrockApi.RootResourceId
+      PathPart: 'questions'
+
+  GenerateResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref BedrockApi
+      ParentId: !GetAtt BedrockApi.RootResourceId
+      PathPart: 'generate'
+
+  QuestionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref BedrockApi
+      ResourceId: !Ref QuestionsResource
+      HttpMethod: GET
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${QuestionsLambda.Arn}/invocations
+
+  GenerateMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref BedrockApi
+      ResourceId: !Ref GenerateResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${BedrockLambda.Arn}/invocations
+
+  # Add OPTIONS method for CORS
+  QuestionsOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref BedrockApi
+      ResourceId: !Ref QuestionsResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'GET,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  GenerateOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref BedrockApi
+      ResourceId: !Ref GenerateResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: 
+      - QuestionsMethod
+      - GenerateMethod
+      - QuestionsOptionsMethod
+      - GenerateOptionsMethod
+    Properties:
+      RestApiId: !Ref BedrockApi
+
+  ApiStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId: !Ref ApiDeployment
+      RestApiId: !Ref BedrockApi
+      StageName: !Ref StageName
+
+
+  WebsiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete    
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-website-bucket
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  WebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref WebsiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub ${WebsiteBucket.Arn}/*
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub arn:aws:cloudfront::${AWS::AccountId}:distribution/${CloudFrontDistribution}
+
+  CloudFrontOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Description: 'Origin Access Control for Website Bucket'
+        Name: !Sub ${AWS::StackName}-OAC
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachedMethods:
+            - GET
+            - HEAD
+            - OPTIONS
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # CachingOptimized policy
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+        Origins:
+          - DomainName: !GetAtt WebsiteBucket.RegionalDomainName
+            Id: S3Origin
+            OriginAccessControlId: !Ref CloudFrontOriginAccessControl
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+
+ # Cognito Identity Pool
+  CognitoIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: !Sub ${AWS::StackName}-identity-pool
+      AllowUnauthenticatedIdentities: true
+
+  # IAM Role for unauthenticated users
+  CognitoUnauthorizedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                'cognito-identity.amazonaws.com:aud': !Ref CognitoIdentityPool
+              'ForAnyValue:StringLike':
+                'cognito-identity.amazonaws.com:amr': unauthenticated
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
+        - arn:aws:iam::aws:policy/AmazonPollyFullAccess
+
+  # Inline policy for Cognito Identity credentials
+  CognitoIdentityCredentialsPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub ${AWS::StackName}-cognito-identity-policy
+      Roles:
+        - !Ref CognitoUnauthorizedRole
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'cognito-identity:GetCredentialsForIdentity'
+            Resource: '*'
+
+  # Attach roles to Identity Pool
+  IdentityPoolRoleAttachment:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref CognitoIdentityPool
+      Roles:
+        unauthenticated: !GetAtt CognitoUnauthorizedRole.Arn
+
+Outputs:
+  # Add these to your existing outputs
+  IdentityPoolId:
+    Description: 'ID of the Cognito Identity Pool'
+    Value: !Ref CognitoIdentityPool
+
+  # Your existing outputs remain unchanged
+  WebsiteBucket:
+    Description: 'Name of the S3 bucket'
+    Value: !Ref WebsiteBucket
+
+  DistributionId:
+    Description: 'ID of the CloudFront distribution'
+    Value: !Ref CloudFrontDistribution
+
+  DistributionDomainName:
+    Description: 'Domain name of the CloudFront distribution'
+    Value: !GetAtt CloudFrontDistribution.DomainName
+
+  ApiEndpoint:
+    Description: 'API Gateway endpoint URL'
+    Value: !Sub 'https://${BedrockApi}.execute-api.${AWS::Region}.amazonaws.com/${ApiStage}'
+    
+  Region:
+    Description: 'AWS Region'
+    Value: !Ref AWS::Region
+
+  DynamoDBTableName:
+    Description: "Name of the DynamoDB table"
+    Value: !Ref InterviewQATable
+
