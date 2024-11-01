@@ -1,7 +1,7 @@
 # GenAI Voice Health Screener
 
 ## Overview
-A solution that demonstrates the use of Generative AI to evaluate if users are providing contextually relevant answers to health screening questions. This tool helps agents automate information collection from prospective clients using voice interactions and AI-powered understanding.
+An AI-powered voice interaction system that evaluates contextual relevance of responses to health screening questions. This solution helps agents automate client information collection using voice interactions and generative AI understanding.
 
 ## Technology Stack
 - **Amazon Bedrock with Anthropic Claude**: For natural language understanding and context evaluation
