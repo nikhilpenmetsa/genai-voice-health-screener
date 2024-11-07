@@ -328,10 +328,9 @@ async function checkAnswerRelevancy(question, answer) {
     const prompt = `Question: "${question}"
 Answer: "${answer}"
 
-Task: Evaluate if this answer is relevant to the question asked. Consider:
+Task: Evaluate if this answer is relevant to the question asked. Match the informal words such as "nope", "yeap", "yup", "nah", "uh-huh" to their standard equivalent "yes" or "no". An ideal answer should map to a "Yes" or "No". Consider:
 1. Does the answer directly address the question?
 2. Is the response on topic?
-3. Does it provide meaningful information?
 
 Provide your response in JSON format with exactly these two fields:
 {
@@ -339,8 +338,24 @@ Provide your response in JSON format with exactly these two fields:
     "Relevancy": <number between 1-10>
 }
 
-Do not include any other details other than the json string. Do not include "Here is my analysis" or any other text.
-The Analysis should be a brief evaluation of the answer's relevance and quality. The Relevancy should be a single number between 1-10, where 10 means perfectly relevant and comprehensive, and 1 means completely irrelevant or off-topic.`;
+The Analysis should be a brief evaluation of the answer's relevance and quality. The Relevancy should be a single number between 1-10, where 10 means perfectly relevant and comprehensive, and 1 means completely irrelevant or off-topic.
+Do not include any other details other than the JSON string. Do not include "Here is my analysis" or "Here is my analysis in JSON format" any other text in the response.
+
+<good_example>
+{
+    "Analysis": "The answer is relevant and comprehensive. It directly addresses the question and provides a clear yes/no answer. However, it does not provide any specific details or examples.",
+    "Relevancy": 9
+}
+</good_example>
+
+<bad_example>
+Here is my analysis in JSON format: 
+{
+    "Analysis": "The answer is relevant and comprehensive. It directly addresses the question and provides a clear yes/no answer. However, it does not provide any specific details or examples.",
+    "Relevancy": 9
+}
+</bad_example>
+`;
 
     try {
         const response = await fetch(`${config.apiEndpoint}/generate`, {

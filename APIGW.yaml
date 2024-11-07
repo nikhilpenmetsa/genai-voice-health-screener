@@ -245,7 +245,7 @@ Resources:
                   # Invoke Bedrock
                   logger.info("Calling Bedrock invoke_model...")
                   response = bedrock.invoke_model(
-                      modelId='anthropic.claude-v2',
+                      modelId='anthropic.claude-v2:1',
                       contentType='application/json',
                       accept='application/json',
                       body=json.dumps(request_body)
