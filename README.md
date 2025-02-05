@@ -23,7 +23,7 @@ An AI-powered voice interaction system that evaluates contextual relevance of re
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/genai-voice-health-screener.git
+git clone https://github.com/nikhilpenmetsa/genai-voice-health-screener.git
 cd genai-voice-health-screener
 ```
 
