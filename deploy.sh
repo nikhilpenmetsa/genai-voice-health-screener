@@ -176,7 +176,7 @@ fi
 
 # Step 6: Insert questions into DynamoDB
 echo "Inserting questions into DynamoDB..."
-python dynamo_question_insert.py --region "${REGION}" --table "${DYNAMODB_TABLE}"
+python dynamo_question_insert_subq.py --region "${REGION}" --table "${DYNAMODB_TABLE}" --file questions.txt
 if [ $? -ne 0 ]; then
     echo "Error: Failed to insert questions into DynamoDB"
     exit 1

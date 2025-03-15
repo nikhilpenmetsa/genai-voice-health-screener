@@ -52,6 +52,14 @@ Launch the application in a chrome browser.
     * Relevancy to the question
     * Comprehensiveness of the answer
     * Score calculation (1-10 scale - 10 means perfectly relevant and comprehensive, and 1 means completely irrelevant or off-topic)
+*For certain questions, follow-up questions may appear based on your response:
+    *If your answer triggers follow-up questions (typically "yes" responses), additional questions will be displayed
+    *Each follow-up question will be read aloud and requires a verbal response
+    *Follow-up questions help gather more detailed information about specific health conditions
+
+*Navigation controls allow you to move between questions:
+    *Use "Previous" and "Next" buttons to navigate through questions
+    *The navigation automatically handles both main questions and follow-up questions
 * For demonstration purpose, updates are made to UI styling based on the relevancy score. In a real world scenario, it can be used to ask follow up questions, or look up data, or take an action.
 
 

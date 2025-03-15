@@ -72,7 +72,6 @@ Resources:
           import boto3
           import logging
           import random
-          from boto3.dynamodb.conditions import Key
 
           # Set up logging
           logger = logging.getLogger()
@@ -84,52 +83,17 @@ Resources:
 
           def get_random_questions(count=5):
               try:
-                  # Use a Scan operation with a projection expression
+                  # Simple scan to get all template questions
                   response = table.scan(
-                      ProjectionExpression='questionId, question, #cat',
-                      ExpressionAttributeNames={
-                          '#cat': 'category'  # 'category' is a reserved word in DynamoDB
-                      }
+                      FilterExpression='sessionId = :template_id',
+                      ExpressionAttributeValues={':template_id': 'TEMPLATE'}
                   )
                   
-                  # Use a dictionary to keep track of unique questions
-                  unique_questions = {}
-                  
-                  # Process initial scan results
-                  for item in response.get('Items', []):
-                      question_id = item.get('questionId')
-                      if question_id not in unique_questions:
-                          unique_questions[question_id] = {
-                              'id': question_id,
-                              'question': item.get('question'),
-                              'category': item.get('category', 'general')
-                          }
-                  
-                  # Handle pagination if there are more items
-                  while 'LastEvaluatedKey' in response:
-                      response = table.scan(
-                          ProjectionExpression='questionId, question, #cat',
-                          ExpressionAttributeNames={
-                              '#cat': 'category'
-                          },
-                          ExclusiveStartKey=response['LastEvaluatedKey']
-                      )
-                      
-                      for item in response.get('Items', []):
-                          question_id = item.get('questionId')
-                          if question_id not in unique_questions:
-                              unique_questions[question_id] = {
-                                  'id': question_id,
-                                  'question': item.get('question'),
-                                  'category': item.get('category', 'general')
-                              }
-                  
-                  # Convert dictionary values to list
-                  all_questions = list(unique_questions.values())
+                  items = response.get('Items', [])
                   
                   # Get random questions
-                  num_questions = min(count, len(all_questions))
-                  random_questions = random.sample(all_questions, num_questions)
+                  num_questions = min(count, len(items))
+                  random_questions = random.sample(items, num_questions)
                   
                   return random_questions
                   
@@ -178,6 +142,7 @@ Resources:
                           'message': 'Internal server error while fetching questions'
                       })
                   }
+
 
       Runtime: python3.11
       Timeout: 30
@@ -430,7 +395,6 @@ Resources:
     DeletionPolicy: Delete
     UpdateReplacePolicy: Delete    
     Properties:
-      BucketName: !Sub ${AWS::StackName}-website-bucket
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true

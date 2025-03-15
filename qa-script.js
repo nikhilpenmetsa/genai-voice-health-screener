@@ -15,7 +15,7 @@ async function loadConfig() {
             IdentityPoolId: config.identityPoolId
         });
         AWS.config.logger = console;
-        
+
         // Initialize Polly after setting region and credentials
         polly = new AWS.Polly();
 
@@ -38,11 +38,18 @@ async function fetchQuestions() {
             answer: "Not answered yet",
             status: "pending",
             relevancyScore: null,
-            analysis: null,  // Add analysis field
-            id: item.id,
-            category: item.category
+            analysis: null,
+            id: item.questionId,
+            hasSubQuestions: item.hasSubQuestions,
+            subQuestions: item.subQuestions?.map(sq => ({
+                ...sq,
+                answer: "Not answered yet",
+                status: "pending",
+                relevancyScore: null,
+                analysis: null
+            })) || [],
+            triggerOnResponse: item.triggerOnResponse
         }));
-
 
         return transformedData;
     } catch (error) {
@@ -50,6 +57,7 @@ async function fetchQuestions() {
         return [];
     }
 }
+
 // Modify the initialization to use async/await
 async function initializeApp() {
     try {
@@ -110,34 +118,102 @@ recognition.continuous = true;
 recognition.interimResults = true;
 
 // Initialize the interface with all questions and placeholder answers
-// In your JavaScript, modify the initializeResponsesList function:
 function initializeResponsesList() {
-    responsesList.innerHTML = INTERVIEW_DATA.map((item, index) => `
-        <div class="response-item ${item.status}" id="response-${index}">
-            <div class="question-number">Question ${index + 1}</div>
+    console.log('Initializing responses list...');
+
+    const html = INTERVIEW_DATA.map((item, index) => {
+        // Change this line to use HTML entities
+        const statusSymbol = item.status === 'completed' ? '&#x2714;' : '&#x25CB;';
+        console.log(`Question ${index + 1} status:`, {
+            status: item.status,
+            intendedSymbol: statusSymbol,
+            actualHTML: `<div class="status-indicator" id="status-${index}">${statusSymbol}</div>`
+        });
+
+
+        return `
+        <div class="response-item ${item.status} ${item.subQuestions && item.subQuestions.length > 0 ? 'has-sub-questions' : ''}" id="response-${index}">
+            <div class="question-number">
+                Question ${index + 1}
+                ${item.subQuestions && item.subQuestions.length > 0 ? '<span class="sub-question-indicator">(Has Follow-up Questions)</span>' : ''}
+            </div>
             <div class="question-text"><strong>Q: ${item.question}</strong></div>
             <div class="answer-text" id="answer-${index}">A: ${item.answer}</div>
             <div class="analysis-text" id="analysis-${index}">
                 ${item.analysis ? `Analysis: ${item.analysis}` : ''}
             </div>
-            <div class="relevancy-score" id="relevancy-${index}">
+            <div class="relevancy-score ${item.relevancyScore >= 8 ? 'high-relevancy' : item.relevancyScore >= 5 ? 'medium-relevancy' : 'low-relevancy'}" id="relevancy-${index}">
                 ${item.relevancyScore ? `Relevancy Score: ${item.relevancyScore}/10` : ''}
             </div>
             <div class="status-indicator" id="status-${index}">
-                ${item.status === 'completed' ? '&#x2714;' : '&#x25CB;'}
+                ${statusSymbol}
             </div>
+            ${item.subQuestions && item.subQuestions.length > 0 ? `
+                <div class="sub-questions ${item.impliedAnswer?.toLowerCase() === 'yes' ? 'show' : 'hide'}" id="sub-questions-${index}">
+                    ${item.subQuestions.map((sq, sqIndex) => `
+                        <div class="sub-question-item ${sq.status}" id="sub-response-${index}-${sqIndex}">
+                            <div class="sub-question-text"><strong>Follow-up: ${sq.question}</strong></div>
+                            <div class="answer-text" id="sub-answer-${index}-${sqIndex}">A: ${sq.answer}</div>
+                            <div class="analysis-text" id="sub-analysis-${index}-${sqIndex}">
+                                ${sq.analysis ? `Analysis: ${sq.analysis}` : ''}
+                            </div>
+                            <div class="relevancy-score ${sq.relevancyScore >= 8 ? 'high-relevancy' : sq.relevancyScore >= 5 ? 'medium-relevancy' : 'low-relevancy'}" id="sub-relevancy-${index}-${sqIndex}">
+                                ${sq.relevancyScore ? `Relevancy Score: ${sq.relevancyScore}/10` : ''}
+                            </div>
+                            <div class="status-indicator" id="sub-status-${index}-${sqIndex}">
+                                ${sq.status === 'completed' ? '&#x2714;' : '&#x25CB;'}
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : ''}
         </div>
-    `).join('');
+    `}).join('');
+
+    responsesList.innerHTML = html;
+
+    // After rendering, let's check what actually got rendered
+    INTERVIEW_DATA.forEach((_, index) => {
+        const statusElement = document.getElementById(`status-${index}`);
+        console.log(`Rendered status for question ${index + 1}:`, {
+            elementContent: statusElement?.textContent,
+            elementHTML: statusElement?.innerHTML,
+            elementInnerText: statusElement?.innerText
+        });
+    });
+
+    // Inspect the first status indicator
+    inspectStatusIndicator(0);
+}
+
+// Helper function to inspect the status indicator - defined outside of initializeResponsesList
+function inspectStatusIndicator(index) {
+    const statusElement = document.getElementById(`status-${index}`);
+    if (statusElement) {
+        console.log('Status Indicator Inspection:', {
+            textContent: statusElement.textContent,
+            innerHTML: statusElement.innerHTML,
+            innerText: statusElement.innerText,
+            textContentCharCodes: Array.from(statusElement.textContent).map(char => char.charCodeAt(0)),
+            innerHTMLCharCodes: Array.from(statusElement.innerHTML).map(char => char.charCodeAt(0)),
+            innerTextCharCodes: Array.from(statusElement.innerText).map(char => char.charCodeAt(0))
+        });
+    }
 }
 
 
 
+
+
 // And in the updateResponse function:
-function updateResponse(index, answer, relevancyScore, analysis) {
-    INTERVIEW_DATA[index].answer = answer;
-    INTERVIEW_DATA[index].status = 'completed';
-    INTERVIEW_DATA[index].relevancyScore = relevancyScore;
-    INTERVIEW_DATA[index].analysis = analysis;
+// Update the updateResponse function to handle sub-questions
+function updateResponse(index, answer, relevancyScore, analysis, impliedAnswer) {
+    const question = INTERVIEW_DATA[index];
+    question.answer = answer;
+    question.status = 'completed';
+    question.relevancyScore = relevancyScore;
+    question.analysis = analysis;
+    question.impliedAnswer = impliedAnswer;  // Store the implied answer
 
     const answerElement = document.getElementById(`answer-${index}`);
     const responseItem = document.getElementById(`response-${index}`);
@@ -149,11 +225,54 @@ function updateResponse(index, answer, relevancyScore, analysis) {
         answerElement.textContent = `A: ${answer}`;
         responseItem.classList.remove('pending');
         responseItem.classList.add('completed');
-        statusIndicator.innerHTML = '&#x2714;'; // Checkmark
+        statusIndicator.innerHTML = '&#x2714;';
         relevancyElement.textContent = `Relevancy Score: ${relevancyScore}/10`;
         analysisElement.textContent = `Analysis: ${analysis}`;
 
-        // Add color coding based on relevancy score
+        // Handle sub-questions visibility based on impliedAnswer
+        if (question.hasSubQuestions) {
+            const subQuestionsDiv = document.getElementById(`sub-questions-${index}`);
+            if (subQuestionsDiv) {
+                if (impliedAnswer?.toLowerCase() === 'yes') {
+                    subQuestionsDiv.classList.remove('hide');
+                    subQuestionsDiv.classList.add('show');
+                } else {
+                    subQuestionsDiv.classList.remove('show');
+                    subQuestionsDiv.classList.add('hide');
+                }
+            }
+        }
+
+        relevancyElement.className = 'relevancy-score ' +
+            (relevancyScore >= 8 ? 'high-relevancy' :
+                relevancyScore >= 5 ? 'medium-relevancy' :
+                    'low-relevancy');
+    }
+}
+// Add new function to update sub-question responses
+function updateSubQuestionResponse(questionIndex, subQuestionIndex, answer, relevancyScore, analysis) {
+    const question = INTERVIEW_DATA[questionIndex];
+    const subQuestion = question.subQuestions[subQuestionIndex];
+
+    subQuestion.answer = answer;
+    subQuestion.status = 'completed';
+    subQuestion.relevancyScore = relevancyScore;
+    subQuestion.analysis = analysis;
+
+    const answerElement = document.getElementById(`sub-answer-${questionIndex}-${subQuestionIndex}`);
+    const responseItem = document.getElementById(`sub-response-${questionIndex}-${subQuestionIndex}`);
+    const statusIndicator = document.getElementById(`sub-status-${questionIndex}-${subQuestionIndex}`);
+    const relevancyElement = document.getElementById(`sub-relevancy-${questionIndex}-${subQuestionIndex}`);
+    const analysisElement = document.getElementById(`sub-analysis-${questionIndex}-${subQuestionIndex}`);
+
+    if (answerElement && responseItem && statusIndicator && relevancyElement && analysisElement) {
+        answerElement.textContent = `A: ${answer}`;
+        responseItem.classList.remove('pending');
+        responseItem.classList.add('completed');
+        statusIndicator.innerHTML = '&#x2714;';
+        relevancyElement.textContent = `Relevancy Score: ${relevancyScore}/10`;
+        analysisElement.textContent = `Analysis: ${analysis}`;
+
         relevancyElement.className = 'relevancy-score ' +
             (relevancyScore >= 8 ? 'high-relevancy' :
                 relevancyScore >= 5 ? 'medium-relevancy' :
@@ -161,29 +280,63 @@ function updateResponse(index, answer, relevancyScore, analysis) {
     }
 }
 
-
-// Display current question
-function displayCurrentQuestion() {
-    if (INTERVIEW_DATA.length > 0) {
-        const currentQuestion = INTERVIEW_DATA[currentQuestionIndex].question;
-        questionDisplay.textContent = currentQuestion;
-
-        // Highlight current question in the list
-        document.querySelectorAll('.response-item').forEach((item, index) => {
-            if (index === currentQuestionIndex) {
-                item.classList.add('current');
-            } else {
-                item.classList.remove('current');
-            }
-        });
-    }
-}
-
-// Update navigation buttons
 function updateNavigationButtons() {
-    prevBtn.disabled = currentQuestionIndex === 0;
-    nextBtn.disabled = currentQuestionIndex === INTERVIEW_DATA.length - 1;
+    // Check if INTERVIEW_DATA exists and has items
+    if (!INTERVIEW_DATA || !INTERVIEW_DATA.length || currentQuestionIndex >= INTERVIEW_DATA.length) {
+        prevBtn.disabled = true;
+        nextBtn.disabled = true;
+        return;
+    }
+
+    const currentQuestion = INTERVIEW_DATA[currentQuestionIndex];
+
+    // Determine if we can move backward
+    let canMovePrev = currentQuestionIndex > 0 || currentSubQuestionIndex > -1;
+
+    // Determine if we can move forward
+    let canMoveNext = false;
+
+    // Check if current question has sub-questions and was answered 'yes'
+    if (currentQuestion.hasSubQuestions && 
+        currentQuestion.impliedAnswer?.toLowerCase() === 'yes') {
+        
+        // If we haven't started sub-questions yet
+        if (currentSubQuestionIndex === -1) {
+            canMoveNext = true; // Always allow moving to first sub-question
+        } 
+        // If we're in the middle of sub-questions
+        else if (currentSubQuestionIndex < currentQuestion.subQuestions.length - 1) {
+            canMoveNext = true; // Allow moving to next sub-question
+        }
+        // If we're at the last sub-question
+        else {
+            canMoveNext = currentQuestionIndex < INTERVIEW_DATA.length - 1;
+        }
+
+        // Special case: If we're on the main question and it has sub-questions
+        if (currentSubQuestionIndex === -1 && currentQuestion.status === 'completed') {
+            canMoveNext = true; // Enable next button to move to sub-questions
+        }
+    } else {
+        // For questions without sub-questions or answered 'no'
+        canMoveNext = currentQuestionIndex < INTERVIEW_DATA.length - 1;
+    }
+
+    prevBtn.disabled = !canMovePrev;
+    nextBtn.disabled = !canMoveNext;
+
+    // Debug output
+    console.log('Navigation state:', {
+        currentQuestionIndex,
+        currentSubQuestionIndex,
+        hasSubQuestions: currentQuestion.hasSubQuestions,
+        impliedAnswer: currentQuestion.impliedAnswer,
+        canMoveNext,
+        subQuestionsLength: currentQuestion.subQuestions?.length
+    });
 }
+
+
 
 // Modify the toggleListening function to speak the question when starting
 function toggleListening() {
@@ -201,29 +354,129 @@ function toggleListening() {
     isListening = !isListening;
 }
 
-// Navigation handlers
-// Modify the nextQuestion and previousQuestion functions to not automatically speak
+// Add variable for tracking sub-questions
+let currentSubQuestionIndex = -1; // -1 means we're on the main question
+
+// Update the nextQuestion function
 function nextQuestion() {
+    const currentQuestion = INTERVIEW_DATA[currentQuestionIndex];
+
+    // Check if current question has sub-questions and was answered "Yes"
+    if (currentQuestion.hasSubQuestions &&
+        currentQuestion.impliedAnswer?.toLowerCase() === 'yes') {
+
+        // If we're on the main question, move to first sub-question
+        if (currentSubQuestionIndex === -1) {
+            currentSubQuestionIndex = 0;
+            displayCurrentQuestion();
+            updateNavigationButtons();
+            // Use existing synthesizeSpeech function
+            synthesizeSpeech(currentQuestion.subQuestions[currentSubQuestionIndex].question);
+            return;
+        }
+
+        // If we have more sub-questions, move to next sub-question
+        if (currentSubQuestionIndex < currentQuestion.subQuestions.length - 1) {
+            currentSubQuestionIndex++;
+            displayCurrentQuestion();
+            updateNavigationButtons();
+            synthesizeSpeech(currentQuestion.subQuestions[currentSubQuestionIndex].question);
+            return;
+        }
+
+        // If we're at the last sub-question, move to next main question
+        currentSubQuestionIndex = -1;
+    }
+
+    // Move to next main question if available
     if (currentQuestionIndex < INTERVIEW_DATA.length - 1) {
         currentQuestionIndex++;
         displayCurrentQuestion();
         updateNavigationButtons();
-        // Only speak if we're currently listening
-        if (isListening) {
-            synthesizeSpeech(INTERVIEW_DATA[currentQuestionIndex].question);
-        }
+        synthesizeSpeech(INTERVIEW_DATA[currentQuestionIndex].question);
     }
 }
 
+// Update the previousQuestion function
 function previousQuestion() {
+    const currentQuestion = INTERVIEW_DATA[currentQuestionIndex];
+
+    // If we're in sub-questions, move to previous sub-question or main question
+    if (currentQuestion.hasSubQuestions &&
+        currentQuestion.impliedAnswer?.toLowerCase() === 'yes') {
+
+        if (currentSubQuestionIndex > 0) {
+            currentSubQuestionIndex--;
+            displayCurrentQuestion();
+            updateNavigationButtons();
+            synthesizeSpeech(currentQuestion.subQuestions[currentSubQuestionIndex].question);
+            return;
+        }
+
+        if (currentSubQuestionIndex === 0) {
+            currentSubQuestionIndex = -1;
+            displayCurrentQuestion();
+            updateNavigationButtons();
+            synthesizeSpeech(currentQuestion.question);
+            return;
+        }
+    }
+
+    // Move to previous main question if available
     if (currentQuestionIndex > 0) {
         currentQuestionIndex--;
+        // Check if previous question has sub-questions and was answered yes
+        const prevQuestion = INTERVIEW_DATA[currentQuestionIndex];
+        if (prevQuestion.hasSubQuestions &&
+            prevQuestion.impliedAnswer?.toLowerCase() === 'yes') {
+            currentSubQuestionIndex = prevQuestion.subQuestions.length - 1;
+            synthesizeSpeech(prevQuestion.subQuestions[currentSubQuestionIndex].question);
+        } else {
+            synthesizeSpeech(prevQuestion.question);
+        }
         displayCurrentQuestion();
         updateNavigationButtons();
-        // Only speak if we're currently listening
-        if (isListening) {
-            synthesizeSpeech(INTERVIEW_DATA[currentQuestionIndex].question);
+    }
+}
+
+// Also update displayCurrentQuestion with similar safety checks
+function displayCurrentQuestion() {
+    if (!INTERVIEW_DATA || !INTERVIEW_DATA.length || currentQuestionIndex >= INTERVIEW_DATA.length) {
+        questionDisplay.textContent = 'Loading questions...';
+        return;
+    }
+
+    const currentQuestion = INTERVIEW_DATA[currentQuestionIndex];
+
+    if (currentSubQuestionIndex >= 0 &&
+        currentQuestion.hasSubQuestions &&
+        currentQuestion.impliedAnswer?.toLowerCase() === 'yes') {
+        // Display sub-question
+        const subQuestion = currentQuestion.subQuestions[currentSubQuestionIndex];
+        questionDisplay.textContent = subQuestion.question;
+    } else {
+        // Display main question
+        questionDisplay.textContent = currentQuestion.question;
+    }
+
+    // Highlight current question in the list
+    document.querySelectorAll('.response-item').forEach((item, index) => {
+        if (index === currentQuestionIndex) {
+            item.classList.add('current');
+        } else {
+            item.classList.remove('current');
         }
+    });
+
+    // Highlight current sub-question if applicable
+    if (currentSubQuestionIndex >= 0) {
+        document.querySelectorAll(`#sub-questions-${currentQuestionIndex} .sub-question-item`).forEach((item, index) => {
+            if (index === currentSubQuestionIndex) {
+                item.classList.add('current-sub');
+            } else {
+                item.classList.remove('current-sub');
+            }
+        });
     }
 }
 
@@ -244,37 +497,72 @@ function toggleListening() {
 }
 
 
-// Modify the recognition.onresult handler to include relevancy check
-// Update the recognition.onresult handler
 recognition.onresult = (event) => {
     const last = event.results.length - 1;
     const text = event.results[last][0].transcript;
     output.textContent = text;
 
     if (event.results[last].isFinal) {
-        const currentQuestion = INTERVIEW_DATA[currentQuestionIndex].question;
+        const currentQuestion = INTERVIEW_DATA[currentQuestionIndex];
 
-        checkAnswerRelevancy(currentQuestion, text)
-            .then(analysis => {
-                if (analysis) {
-                    updateResponse(
+        // Determine if we're handling a sub-question or main question
+        if (currentSubQuestionIndex >= 0 &&
+            currentQuestion.hasSubQuestions &&
+            currentQuestion.impliedAnswer?.toLowerCase() === 'yes') {
+            // Handle sub-question
+            checkAnswerRelevancy(currentQuestion.subQuestions[currentSubQuestionIndex].question, text)
+                .then(analysis => {
+                    if (analysis) {
+                        updateSubQuestionResponse(
+                            currentQuestionIndex,
+                            currentSubQuestionIndex,
+                            text,
+                            analysis.Relevancy,
+                            analysis.Analysis
+                        );
+                    } else {
+                        updateSubQuestionResponse(
+                            currentQuestionIndex,
+                            currentSubQuestionIndex,
+                            text,
+                            null,
+                            null
+                        );
+                    }
+                })
+                .catch(error => {
+                    console.error('Relevancy Analysis Error:', error);
+                    updateSubQuestionResponse(
                         currentQuestionIndex,
+                        currentSubQuestionIndex,
                         text,
-                        analysis.Relevancy,
-                        analysis.Analysis  // Assuming the API returns an Analysis field
+                        null,
+                        null
                     );
-                } else {
-                    updateResponse(currentQuestionIndex, text, null, null);
-                }
-            })
-            .catch(error => {
-                console.error('Relevancy Analysis Error:', error);
-                updateResponse(currentQuestionIndex, text, null, null);
-            });
+                });
+        } else {
+            // Handle main question
+            checkAnswerRelevancy(currentQuestion.question, text)
+                .then(analysis => {
+                    if (analysis) {
+                        updateResponse(
+                            currentQuestionIndex,
+                            text,
+                            analysis.Relevancy,
+                            analysis.Analysis,
+                            analysis.ImpliedAnswer
+                        );
+                    } else {
+                        updateResponse(currentQuestionIndex, text, null, null, null);
+                    }
+                })
+                .catch(error => {
+                    console.error('Relevancy Analysis Error:', error);
+                    updateResponse(currentQuestionIndex, text, null, null, null);
+                });
+        }
     }
 };
-
-
 
 recognition.onerror = (event) => {
     console.error('Speech recognition error:', event.error);
@@ -332,10 +620,11 @@ Task: Evaluate if this answer is relevant to the question asked. Match the infor
 1. Does the answer directly address the question?
 2. Is the response on topic?
 
-Provide your response in JSON format with exactly these two fields:
+Provide your response in JSON format with exactly these three fields:
 {
     "Analysis": "Your detailed analysis of the answer here",
     "Relevancy": <number between 1-10>
+    "ImpliedAnswer": "Yes" or "No"
 }
 
 The Analysis should be a brief evaluation of the answer's relevance and quality. The Relevancy should be a single number between 1-10, where 10 means perfectly relevant and comprehensive, and 1 means completely irrelevant or off-topic.
@@ -344,15 +633,35 @@ Do not include any other details other than the JSON string. Do not include "Her
 <good_example>
 {
     "Analysis": "The answer is relevant and comprehensive. It directly addresses the question and provides a clear yes/no answer. However, it does not provide any specific details or examples.",
-    "Relevancy": 9
+    "Relevancy": 9,
+    "ImpliedAnswer": "Yes"
 }
 </good_example>
+
+<good_example_2>
+{
+    "Analysis": "The answer is relevant and comprehensive. It directly addresses the question and provides a clear yes/no answer.",
+    "Relevancy": 10,
+    "ImpliedAnswer": "No"
+}
+</good_example_2>
+
 
 <bad_example>
 Here is my analysis in JSON format: 
 {
     "Analysis": "The answer is relevant and comprehensive. It directly addresses the question and provides a clear yes/no answer. However, it does not provide any specific details or examples.",
     "Relevancy": 9
+    "ImpliedAnswer": "Yes"
+}
+</bad_example>
+
+<bad_example>
+Here is my analysis: 
+{
+    "Analysis": "The answer is relevant and comprehensive. It directly addresses the question and provides a clear yes/no answer. However, it does not provide any specific details or examples.",
+    "Relevancy": 9
+    "ImpliedAnswer": "Yes"
 }
 </bad_example>
 `;
@@ -367,8 +676,6 @@ Here is my analysis in JSON format:
             body: JSON.stringify({ prompt: prompt })
         });
 
-        console.log('API response status:', response.status);
-
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -378,36 +685,24 @@ Here is my analysis in JSON format:
 
         if (data.response) {
             try {
-                // If data.response is a string containing JSON, parse it
-                // If it's already an object, just return it
-                const analysisData = typeof data.response === 'string'
-                    ? JSON.parse(data.response)
-                    : data.response;
-
-                console.log('Answer Analysis:', {
-                    question,
-                    answer,
-                    analysis: analysisData.Analysis,
-                    relevancy: analysisData.Relevancy,
-                    timestamp: new Date().toISOString()
-                });
-                return analysisData;
+                // Extract JSON from the response string
+                const jsonMatch = data.response.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    const jsonStr = jsonMatch[0];
+                    const analysisData = JSON.parse(jsonStr);
+                    console.log('Parsed Analysis Data:', analysisData);
+                    return analysisData;
+                }
             } catch (parseError) {
                 console.error('Error parsing JSON response:', parseError);
-                return {
-                    Analysis: data.response,
-                    Relevancy: 0
-                };
+                return null;
             }
-        } else {
-            console.error('No response in data:', data);
-            return null;
         }
     } catch (error) {
         console.error('Error checking answer relevancy:', error);
-        console.error('Error stack:', error.stack);
         return null;
     }
+
 }
 
 // Event listeners

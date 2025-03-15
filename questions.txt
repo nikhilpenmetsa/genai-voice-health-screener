@@ -1,0 +1,41 @@
+Q|1|Are you a citizen of the United States?
+Q|2|Have you ever been rejected for life insurance, rated, or failed to receive a policy as applied for?
+Q|3|Have you ever had or been treated for high blood pressure, chest pain, heart attack, stroke or any heart or circulatory disorder?
+SQ|3.1|When was your last cardiac event/diagnosis?
+SQ|3.2|What medications are you currently taking for this condition?
+Q|4|Have you ever had or been treated for asthma, emphysema, or other respiratory disorder?
+Q|5|Have you ever had or been treated for ulcer, colitis, or other digestive tract disorder?
+Q|6|Have you ever had or been treated for cirrhosis, hepatitis, or other liver disorder or any blood disorder?
+Q|7|Have you ever had or been treated for diabetes or other endocrine disorder?
+SQ|7.1|What type of diabetes do you have (Type 1 or Type 2)?
+SQ|7.2|What was your last HbA1c reading?
+Q|8|Have you ever had or been treated for cancer, tumor, or unexplained masses?
+SQ|8.1|What type of cancer/tumor was diagnosed and when?
+SQ|8.2|When was your last treatment or follow-up?
+Q|9|Have you ever had or been treated for kidney, prostate, urinary, bladder or other genitourinary disorder?
+Q|10|Have you ever had or been treated for paralysis, epilepsy, mental disease or disorder or any other nervous system, brain disorder or psychological disorder?
+Q|11|Have you ever had or been treated for disease of the breasts, uterus, or ovaries?
+Q|12|Have you ever had or been treated for rheumatoid arthritis or any musculoskeletal disorder?
+Q|13|In the last five years, have you had a physical examination?
+Q|14|In the last five years, have you had any medical treatment? (includes prescription medications)
+SQ|14.1|What condition(s) were you treated for?
+SQ|14.2|Are you currently taking any prescription medications?
+Q|15|In the last five years, have you been hospitalized?
+Q|16|Have you ever applied for or received disability or workers' compensation benefits based on permanent disability or are you currently receiving government, workers' compensation or disability policy benefits for temporary disability?
+Q|17|Have you ever been treated or been advised to be treated for alcoholism or alcohol abuse including membership in A.A., or been advised by a physician to reduce alcohol consumption?
+SQ|17.1|When was your last treatment?
+SQ|17.2|How long have you been sober?
+Q|18|Have you ever used alcohol to excess or used narcotics, sedatives, or hallucinogens?
+Q|19|Have you used marijuana in the past year?
+Q|20|Have you ever been arrested, including arrests for driving while intoxicated or under the influence?
+Q|21|Do you smoke cigarettes or use tobacco in any other form?
+SQ|21.1|How many cigarettes do you smoke per day?
+SQ|21.2|How long have you been smoking?
+Q|22|If you are a former user of tobacco, when did you quit?
+Q|23|Do you desire Automatic Premium Loan Provision (if available)?
+Q|24|Do you have existing life insurance or annuities in force, including policies under conditional receipt, other than Group or Credit Life Insurance with this or any other company?
+Q|25|Is the insurance applied for intended to replace or change any existing insurance or annuities with this or any other company?
+Q|26|Within the last two years, have you made or intend to make any flights other than as a passenger on a scheduled airline?
+Q|27|Within the last two years, have you engaged in or intend to engage in automobile, motorboat, or motorcycle racing, scuba, skin or sky diving?
+Q|28|Do you plan to travel or reside outside the United States or Canada within the next year?
+Q|29|Have you ever tested positive for exposure to the Human Immunodeficiency Virus?

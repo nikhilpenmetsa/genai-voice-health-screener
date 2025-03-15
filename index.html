@@ -5,6 +5,68 @@
     <title>Voice based health screening assistant</title>
     <link rel="icon" href="data:,">
     <style>
+        /* Add these styles to your CSS */
+        .response-item.has-sub-questions {
+            border-left: 4px solid #2196F3;
+            /* Blue border for questions with sub-questions */
+            background-color: #f8f9ff;
+            /* Light blue background */
+        }
+
+        .sub-question-indicator {
+            font-size: 0.85em;
+            color: #2196F3;
+            margin-left: 8px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background-color: #e3f2fd;
+            display: inline-block;
+        }
+
+        /* Optional: Add a hover state to make it even more noticeable */
+        .response-item.has-sub-questions:hover {
+            background-color: #f0f4ff;
+        }
+
+        /* Make sure sub-questions are visually nested */
+        .sub-questions {
+            margin-left: 20px;
+            padding-left: 15px;
+            border-left: 2px solid #e0e0e0;
+        }
+
+        .sub-question-item.current-sub {
+            border-left: 3px solid #007bff;
+            background-color: #f0f7ff;
+        }
+
+        /* .sub-questions {
+            margin-left: 20px;
+            padding-left: 10px;
+            border-left: 2px solid #ccc;
+            margin-top: 10px;
+        } */
+
+        .sub-questions.hide {
+            display: none;
+        }
+
+        .sub-questions.show {
+            display: block;
+        }
+
+        .sub-question-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+
+        .sub-question-text {
+            color: #666;
+            margin-bottom: 5px;
+        }
+
         .container {
             max-width: 800px;
             margin: 0 auto;
@@ -86,9 +148,17 @@
         }
 
         .status-indicator {
-            float: right;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            /* Change from center to flex-end for right justification */
             font-size: 1.2em;
+            line-height: 1;
+            padding-right: 10px;
+            /* Optional: adds some space from the right edge */
         }
+
+
 
         #output {
             min-height: 50px;
@@ -135,7 +205,7 @@
 
 <body>
     <div class="container">
-        <h1>Health screening assistant</h1>
+        <h1>Health screening assistant (v2)</h1>
 
         <div class="question-section">
             <h2>Current Question:</h2>
